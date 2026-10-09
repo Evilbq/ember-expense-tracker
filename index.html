@@ -1,0 +1,281 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>Ember Expense Tracker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f5f9;
+      color: #172033;
+    }
+    header {
+      background: #172033;
+      color: white;
+      padding: 26px 20px;
+    }
+    header div, main { max-width: 850px; margin: auto; }
+    header h1 { margin: 0 0 7px; font-size: 27px; }
+    header p { margin: 0; color: #cbd5e1; }
+    main { padding: 20px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .card, .panel {
+      background: white;
+      border-radius: 15px;
+      padding: 17px;
+      box-shadow: 0 3px 14px #1720330a;
+    }
+    .card span { color: #667085; font-size: 13px; }
+    .card strong { display: block; margin-top: 9px; font-size: 20px; overflow-wrap: anywhere; }
+    .income { color: #13865c; }
+    .expense { color: #d94b55; }
+    h2 { font-size: 19px; margin: 0 0 17px; }
+    .panel { margin-bottom: 20px; }
+    form { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+    label { font-size: 13px; color: #475467; display: grid; gap: 7px; }
+    input, select, button {
+      width: 100%; min-width: 0; font: inherit; border-radius: 9px;
+      padding: 12px; border: 1px solid #d0d5dd; background: white;
+    }
+    button { border: 0; background: #e56d3e; color: white; font-weight: 650; cursor: pointer; }
+    button:active { opacity: .8; }
+    .full { grid-column: 1 / -1; }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .toolbar h2 { margin: 0; }
+    .toolbar select { max-width: 155px; }
+    .transaction {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 14px 0; border-bottom: 1px solid #eaecf0;
+    }
+    .transaction:last-child { border-bottom: 0; }
+    .tx-name { font-weight: 650; overflow-wrap: anywhere; }
+    .tx-meta { color: #667085; font-size: 12px; margin-top: 5px; }
+    .tx-right { text-align: right; flex-shrink: 0; }
+    .tx-amount { font-weight: 700; }
+    .delete { width: auto; padding: 6px 9px; margin-top: 6px; background: #fff0f0; color: #c43535; font-size: 12px; }
+    .empty { color: #667085; text-align: center; padding: 22px 0; }
+    footer { text-align: center; color: #667085; font-size: 12px; padding: 10px 20px 28px; }
+    @media (max-width: 540px) {
+      main { padding: 14px; }
+      .cards { gap: 7px; }
+      .card { padding: 12px 9px; }
+      .card strong { font-size: 16px; }
+      .card span { font-size: 11px; }
+      form { grid-template-columns: 1fr; }
+      .full { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🔥 Ember</h1>
+      <p>Your simple personal finance tracker</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="cards">
+      <div class="card">
+        <span>Current balance</span>
+        <strong id="balance">₦0.00</strong>
+      </div>
+      <div class="card">
+        <span>Total income</span>
+        <strong class="income" id="income">₦0.00</strong>
+      </div>
+      <div class="card">
+        <span>Total expenses</span>
+        <strong class="expense" id="expenses">₦0.00</strong>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Add a transaction</h2>
+      <form id="transaction-form">
+        <label>
+          Description
+          <input id="description" type="text" maxlength="80" placeholder="e.g. Internet subscription" required>
+        </label>
+        <label>
+          Amount (₦)
+          <input id="amount" type="number" min="0.01" step="0.01" placeholder="5000" required>
+        </label>
+        <label>
+          Type
+          <select id="type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </label>
+        <label>
+          Category
+          <select id="category">
+            <option>Food</option>
+            <option>Transport</option>
+            <option>Bills</option>
+            <option>Shopping</option>
+            <option>Salary</option>
+            <option>Freelance</option>
+            <option>Education</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label class="full">
+          Date
+          <input id="date" type="date" required>
+        </label>
+        <button class="full" type="submit">+ Add transaction</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <h2>Recent transactions</h2>
+        <select id="filter" aria-label="Filter transactions">
+          <option value="all">All activity</option>
+          <option value="income">Income only</option>
+          <option value="expense">Expenses only</option>
+        </select>
+      </div>
+      <div id="transaction-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer>Ember Expense Tracker · Your data stays in this browser.</footer>
+
+  <script>
+    const STORAGE_KEY = "ember-expense-tracker-v1";
+    const form = document.getElementById("transaction-form");
+    const list = document.getElementById("transaction-list");
+    const filter = document.getElementById("filter");
+    let transactions = [];
+
+    try {
+      transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      if (!Array.isArray(transactions)) transactions = [];
+    } catch {
+      transactions = [];
+    }
+
+    document.getElementById("date").value =
+      new Date().toLocaleDateString("en-CA");
+
+    function money(value) {
+      return new Intl.NumberFormat("en-NG", {
+        style: "currency", currency: "NGN"
+      }).format(value);
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    }
+
+    function render() {
+      const income = transactions
+        .filter(t => t.type === "income")
+        .reduce((sum, t) => sum + t.amount, 0);
+      const expenses = transactions
+        .filter(t => t.type === "expense")
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      document.getElementById("balance").textContent = money(income - expenses);
+      document.getElementById("income").textContent = money(income);
+      document.getElementById("expenses").textContent = money(expenses);
+
+      const visible = transactions
+        .filter(t => filter.value === "all" || t.type === filter.value)
+        .slice()
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      list.replaceChildren();
+
+      if (!visible.length) {
+        const message = document.createElement("p");
+        message.className = "empty";
+        message.textContent = "No transactions yet. Add your first one above!";
+        list.appendChild(message);
+        return;
+      }
+
+      visible.forEach(t => {
+        const row = document.createElement("div");
+        row.className = "transaction";
+
+        const info = document.createElement("div");
+        const name = document.createElement("div");
+        name.className = "tx-name";
+        name.textContent = t.description;
+
+        const meta = document.createElement("div");
+        meta.className = "tx-meta";
+        meta.textContent = `${t.category} · ${t.date}`;
+
+        info.append(name, meta);
+
+        const right = document.createElement("div");
+        right.className = "tx-right";
+
+        const amount = document.createElement("div");
+        amount.className = `tx-amount ${t.type}`;
+        amount.textContent = `${t.type === "income" ? "+" : "−"}${money(t.amount)}`;
+
+        const del = document.createElement("button");
+        del.className = "delete";
+        del.type = "button";
+        del.textContent = "Delete";
+        del.setAttribute("aria-label", `Delete ${t.description}`);
+        del.addEventListener("click", () => {
+          transactions = transactions.filter(item => item.id !== t.id);
+          save();
+          render();
+        });
+
+        right.append(amount, del);
+        row.append(info, right);
+        list.appendChild(row);
+      });
+    }
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+
+      const description = document.getElementById("description").value.trim();
+      const amount = Number(document.getElementById("amount").value);
+      const date = document.getElementById("date").value;
+
+      if (!description || !Number.isFinite(amount) || amount <= 0 || !date) {
+        alert("Please enter a description, a valid positive amount, and a date.");
+        return;
+      }
+
+      transactions.push({
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        description,
+        amount,
+        date,
+        type: document.getElementById("type").value,
+        category: document.getElementById("category").value
+      });
+
+      save();
+      form.reset();
+      document.getElementById("date").value = new Date().toLocaleDateString("en-CA");
+      render();
+    });
+
+    filter.addEventListener("change", render);
+    render();
+  </script>
+</body>
+</html>
