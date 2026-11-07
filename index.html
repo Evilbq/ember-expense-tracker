@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,6 +63,10 @@
     .tx-amount { font-weight: 700; }
     .delete { width: auto; padding: 6px 9px; margin-top: 6px; background: #fff0f0; color: #c43535; font-size: 12px; }
     .empty { color: #667085; text-align: center; padding: 22px 0; }
+    .budget-bar { height: 10px; background: #eaecf0; border-radius: 5px; margin-top: 8px; overflow: hidden; }
+    .budget-fill { height: 100%; background: #e56d3e; transition: width 0.3s; }
+    .category-list { display: flex; flex-direction: column; gap: 8px; }
+    .cat-row { display: flex; justify-content: space-between; font-size: 14px; }
     footer { text-align: center; color: #667085; font-size: 12px; padding: 10px 20px 28px; }
     @media (max-width: 540px) {
       main { padding: 14px; }
@@ -98,6 +101,16 @@
         <span>Total expenses</span>
         <strong class="expense" id="expenses">₦0.00</strong>
       </div>
+    </section>
+
+    <section class="panel">
+      <h2>Monthly Budget</h2>
+      <label>
+        Set monthly expense limit (₦)
+        <input id="budget-input" type="number" min="0" step="1000" placeholder="e.g. 150000">
+      </label>
+      <button id="save-budget" style="margin-top:10px;">Save Budget</button>
+      <div id="budget-status" style="margin-top:12px;"></div>
     </section>
 
     <section class="panel">
@@ -139,6 +152,11 @@
       </form>
     </section>
 
+    <section class="panel" id="category-panel" style="display:none;">
+      <h2>Spending by Category</h2>
+      <div class="category-list" id="category-list"></div>
+    </section>
+
     <section class="panel">
       <div class="toolbar">
         <h2>Recent transactions</h2>
@@ -156,10 +174,18 @@
 
   <script>
     const STORAGE_KEY = "ember-expense-tracker-v1";
+    const BUDGET_KEY = "ember-budget";
     const form = document.getElementById("transaction-form");
     const list = document.getElementById("transaction-list");
     const filter = document.getElementById("filter");
+    const budgetInput = document.getElementById("budget-input");
+    const saveBudgetBtn = document.getElementById("save-budget");
+    const budgetStatus = document.getElementById("budget-status");
+    const categoryPanel = document.getElementById("category-panel");
+    const categoryList = document.getElementById("category-list");
+
     let transactions = [];
+    let monthlyBudget = Number(localStorage.getItem(BUDGET_KEY)) || 0;
 
     try {
       transactions = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -168,8 +194,8 @@
       transactions = [];
     }
 
-    document.getElementById("date").value =
-      new Date().toLocaleDateString("en-CA");
+    document.getElementById("date").value = new Date().toLocaleDateString("en-CA");
+    budgetInput.value = monthlyBudget || "";
 
     function money(value) {
       return new Intl.NumberFormat("en-NG", {
@@ -181,17 +207,63 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
     }
 
-    function render() {
-      const income = transactions
-        .filter(t => t.type === "income")
-        .reduce((sum, t) => sum + t.amount, 0);
-      const expenses = transactions
+    function currentMonthExpenses() {
+      const now = new Date();
+      const month = now.getMonth();
+      const year = now.getFullYear();
+      return transactions
         .filter(t => t.type === "expense")
+        .filter(t => {
+          const d = new Date(t.date);
+          return d.getMonth() === month && d.getFullYear() === year;
+        })
         .reduce((sum, t) => sum + t.amount, 0);
+    }
+
+    function updateBudget() {
+      if (!monthlyBudget) {
+        budgetStatus.innerHTML = `<p style="color:#667085;">Set a monthly budget to track progress.</p>`;
+        return;
+      }
+      const spent = currentMonthExpenses();
+      const percent = Math.min(100, (spent / monthlyBudget) * 100);
+      const remaining = monthlyBudget - spent;
+      budgetStatus.innerHTML = `
+        <div>Spent this month: <strong>${money(spent)}</strong> of ${money(monthlyBudget)}</div>
+        <div class="budget-bar"><div class="budget-fill" style="width:${percent}%; background:${percent > 90 ? '#d94b55' : '#e56d3e'}"></div></div>
+        <div style="margin-top:6px; font-size:13px; color:${remaining < 0 ? '#d94b55' : '#13865c'}">
+          ${remaining >= 0 ? `Remaining: ${money(remaining)}` : `Over budget by ${money(Math.abs(remaining))}`}
+        </div>
+      `;
+    }
+
+    function updateCategories() {
+      const expenses = transactions.filter(t => t.type === "expense");
+      if (!expenses.length) {
+        categoryPanel.style.display = "none";
+        return;
+      }
+      const totals = {};
+      expenses.forEach(t => {
+        totals[t.category] = (totals[t.category] || 0) + t.amount;
+      });
+      const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+      categoryList.innerHTML = sorted.map(([cat, amt]) => 
+        `<div class="cat-row"><span>${cat}</span><strong>${money(amt)}</strong></div>`
+      ).join("");
+      categoryPanel.style.display = "block";
+    }
+
+    function render() {
+      const income = transactions.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+      const expenses = transactions.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
 
       document.getElementById("balance").textContent = money(income - expenses);
       document.getElementById("income").textContent = money(income);
       document.getElementById("expenses").textContent = money(expenses);
+
+      updateBudget();
+      updateCategories();
 
       const visible = transactions
         .filter(t => filter.value === "all" || t.type === filter.value)
@@ -246,6 +318,12 @@
         list.appendChild(row);
       });
     }
+
+    saveBudgetBtn.addEventListener("click", () => {
+      monthlyBudget = Number(budgetInput.value) || 0;
+      localStorage.setItem(BUDGET_KEY, monthlyBudget);
+      updateBudget();
+    });
 
     form.addEventListener("submit", event => {
       event.preventDefault();
