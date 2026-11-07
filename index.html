@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Ember · Expense Tracker</title>
   <style>
     :root {
@@ -120,7 +122,6 @@
       border: 1px solid var(--border);
       background: var(--card);
       color: var(--text);
-      transition: border-color 0.15s;
     }
     input:focus, select:focus {
       outline: none;
@@ -132,11 +133,16 @@
       color: white;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: background 0.15s;
     }
     button:hover { background: var(--primary-hover); }
-    button:active { transform: scale(0.98); }
     .full { grid-column: 1 / -1; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-weight: 600;
+    }
     .toolbar {
       display: flex;
       align-items: center;
@@ -196,6 +202,22 @@
       align-items: center;
       font-size: 14.5px;
     }
+    .chart-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    #chart { max-width: 220px; max-height: 220px; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px 16px;
+      font-size: 13.5px;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-color { width: 12px; height: 12px; border-radius: 3px; }
     footer {
       text-align: center;
       color: var(--muted);
@@ -286,8 +308,15 @@
     </section>
 
     <section class="panel" id="category-panel" style="display:none;">
-      <h2>Spending by Category</h2>
-      <div class="category-list" id="category-list"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0;">Spending by Category</h2>
+        <button id="export-csv" class="btn-secondary" style="width:auto; padding:8px 14px; font-size:13.5px;">Export CSV</button>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart" width="220" height="220"></canvas>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="category-list" id="category-list" style="margin-top:20px;"></div>
     </section>
 
     <section class="panel">
@@ -316,6 +345,11 @@
     const budgetStatus = document.getElementById("budget-status");
     const categoryPanel = document.getElementById("category-panel");
     const categoryList = document.getElementById("category-list");
+    const chartCanvas = document.getElementById("chart");
+    const legendEl = document.getElementById("legend");
+    const exportBtn = document.getElementById("export-csv");
+
+    const COLORS = ["#f97316", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#eab308", "#ef4444", "#64748b"];
 
     let transactions = [];
     let monthlyBudget = Number(localStorage.getItem(BUDGET_KEY)) || 0;
@@ -368,6 +402,38 @@
       `;
     }
 
+    function drawChart(categories) {
+      const ctx = chartCanvas.getContext("2d");
+      const total = categories.reduce((s, c) => s + c.amount, 0);
+      if (!total) return;
+
+      ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+      const centerX = chartCanvas.width / 2;
+      const centerY = chartCanvas.height / 2;
+      const radius = 80;
+      const innerRadius = 50;
+      let startAngle = -Math.PI / 2;
+
+      categories.forEach((cat, i) => {
+        const sliceAngle = (cat.amount / total) * 2 * Math.PI;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+        ctx.arc(centerX, centerY, innerRadius, startAngle + sliceAngle, startAngle, true);
+        ctx.closePath();
+        ctx.fillStyle = COLORS[i % COLORS.length];
+        ctx.fill();
+        startAngle += sliceAngle;
+      });
+
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--text").trim() || "#0f172a";
+      ctx.font = "bold 16px -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Total", centerX, centerY - 8);
+      ctx.font = "13px -apple-system, sans-serif";
+      ctx.fillText(money(total), centerX, centerY + 10);
+    }
+
     function updateCategories() {
       const expenses = transactions.filter(t => t.type === "expense");
       if (!expenses.length) {
@@ -376,18 +442,54 @@
       }
       const totals = {};
       expenses.forEach(t => { totals[t.category] = (totals[t.category] || 0) + t.amount; });
-      const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-      const max = sorted[0][1];
-      categoryList.innerHTML = sorted.map(([cat, amt]) => `
-        <div>
-          <div class="cat-row">
-            <span>${cat}</span>
-            <strong>${money(amt)}</strong>
-          </div>
-          <div class="cat-bar"><div class="cat-fill" style="width:${(amt / max) * 100}%"></div></div>
+      const sorted = Object.entries(totals)
+        .map(([name, amount]) => ({ name, amount }))
+        .sort((a, b) => b.amount - a.amount);
+
+      const max = sorted[0].amount;
+
+      legendEl.innerHTML = sorted.map((cat, i) => `
+        <div class="legend-item">
+          <div class="legend-color" style="background:${COLORS[i % COLORS.length]}"></div>
+          <span>${cat.name}</span>
         </div>
       `).join("");
+
+      categoryList.innerHTML = sorted.map((cat, i) => `
+        <div>
+          <div class="cat-row">
+            <span>${cat.name}</span>
+            <strong>${money(cat.amount)}</strong>
+          </div>
+          <div class="cat-bar"><div class="cat-fill" style="width:${(cat.amount / max) * 100}%; background:${COLORS[i % COLORS.length]}"></div></div>
+        </div>
+      `).join("");
+
+      drawChart(sorted);
       categoryPanel.style.display = "block";
+    }
+
+    function exportCSV() {
+      if (!transactions.length) {
+        alert("No transactions to export.");
+        return;
+      }
+      const headers = ["Date", "Description", "Category", "Type", "Amount"];
+      const rows = transactions.map(t => [
+        t.date,
+        `"${t.description.replace(/"/g, '""')}"`,
+        t.category,
+        t.type,
+        t.amount.toFixed(2)
+      ]);
+      const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ember-expenses-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     function render() {
@@ -441,6 +543,8 @@
       localStorage.setItem(BUDGET_KEY, monthlyBudget);
       updateBudget();
     });
+
+    exportBtn.addEventListener("click", exportCSV);
 
     form.addEventListener("submit", e => {
       e.preventDefault();
