@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0f172a">
-  <title>Ember Expense Tracker</title>
+  <title>Ember · Expense Tracker</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -13,9 +13,11 @@
       --muted: #64748b;
       --border: #e2e8f0;
       --primary: #f97316;
+      --primary-hover: #ea580c;
       --income: #16a34a;
       --expense: #dc2626;
-      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08);
+      --radius: 16px;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -24,26 +26,39 @@
         --text: #f1f5f9;
         --muted: #94a3b8;
         --border: #334155;
-        --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
+        --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4);
       }
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.5;
+      min-height: 100vh;
     }
     header {
-      background: linear-gradient(135deg, #0f172a, #1e293b);
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
       color: white;
-      padding: 32px 20px 28px;
+      padding: 36px 20px 32px;
+      text-align: center;
     }
-    header div, main { max-width: 820px; margin: auto; }
-    header h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; }
-    header p { margin: 0; color: #cbd5e1; font-size: 15px; }
-    main { padding: 20px; }
+    header h1 {
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+    header p {
+      color: #cbd5e1;
+      font-size: 15px;
+      opacity: 0.9;
+    }
+    main {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
     .cards {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -52,85 +67,171 @@
     }
     .card, .panel {
       background: var(--card);
-      border-radius: 16px;
-      padding: 18px;
+      border-radius: var(--radius);
+      padding: 20px;
       box-shadow: var(--shadow);
       border: 1px solid var(--border);
     }
-    .card span { color: var(--muted); font-size: 13px; font-weight: 500; }
-    .card strong { display: block; margin-top: 6px; font-size: 20px; font-weight: 700; }
+    .card {
+      text-align: center;
+      padding: 18px 12px;
+    }
+    .card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .card strong {
+      display: block;
+      font-size: 20px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .income { color: var(--income); }
     .expense { color: var(--expense); }
-    h2 { font-size: 18px; margin: 0 0 16px; font-weight: 700; }
+    h2 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
     .panel { margin-bottom: 16px; }
-    form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-    label { font-size: 13px; color: var(--muted); font-weight: 500; display: grid; gap: 6px; }
+    form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+      display: grid;
+      gap: 6px;
+    }
     input, select, button {
-      width: 100%; font: inherit; border-radius: 10px;
-      padding: 12px 14px; border: 1px solid var(--border); background: var(--card);
+      font: inherit;
+      border-radius: 12px;
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      background: var(--card);
       color: var(--text);
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
     }
     button {
-      border: 0; background: var(--primary); color: white; font-weight: 600;
-      cursor: pointer; transition: opacity 0.15s;
+      border: none;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
     }
-    button:active { opacity: 0.85; }
+    button:hover { background: var(--primary-hover); }
+    button:active { transform: scale(0.98); }
     .full { grid-column: 1 / -1; }
-    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    .toolbar h2 { margin: 0; }
-    .toolbar select { max-width: 150px; }
-    .transaction {
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border);
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
     }
-    .transaction:last-child { border-bottom: 0; }
-    .tx-name { font-weight: 600; }
+    .toolbar h2 { margin: 0; }
+    .toolbar select { max-width: 150px; font-size: 14px; }
+    .transaction {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .transaction:last-child { border-bottom: none; }
+    .tx-name { font-weight: 600; font-size: 15px; }
     .tx-meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
     .tx-right { text-align: right; }
-    .tx-amount { font-weight: 700; font-size: 15px; }
+    .tx-amount { font-weight: 700; font-size: 15.5px; }
     .delete {
-      width: auto; padding: 6px 10px; margin-top: 6px;
-      background: transparent; color: var(--expense); font-size: 12px; font-weight: 600;
+      width: auto;
+      padding: 6px 11px;
+      margin-top: 6px;
+      background: transparent;
+      color: var(--expense);
+      font-size: 12px;
+      font-weight: 600;
       border: 1px solid var(--expense);
+      border-radius: 8px;
     }
-    .empty { color: var(--muted); text-align: center; padding: 28px 0; }
-    .budget-bar { height: 8px; background: var(--border); border-radius: 4px; margin-top: 10px; overflow: hidden; }
-    .budget-fill { height: 100%; background: var(--primary); transition: width 0.3s; }
-    .category-list { display: flex; flex-direction: column; gap: 10px; }
-    .cat-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-    .cat-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 4px; overflow: hidden; }
-    .cat-fill { height: 100%; background: var(--primary); }
-    footer { text-align: center; color: var(--muted); font-size: 12px; padding: 16px 20px 32px; }
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 32px 0;
+      font-size: 14.5px;
+    }
+    .budget-bar, .cat-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+    .budget-fill, .cat-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+    .category-list { display: flex; flex-direction: column; gap: 14px; }
+    .cat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14.5px;
+    }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12.5px;
+      padding: 20px 16px 40px;
+    }
     @media (max-width: 540px) {
-      main { padding: 14px; }
+      main { padding: 16px 12px 32px; }
       .cards { gap: 8px; }
-      .card { padding: 14px 10px; }
-      .card strong { font-size: 16px; }
+      .card { padding: 14px 8px; }
+      .card strong { font-size: 17px; }
       form { grid-template-columns: 1fr; }
       .full { grid-column: auto; }
+      header { padding: 28px 16px 24px; }
+      header h1 { font-size: 28px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1>🔥 Ember</h1>
-      <p>Your simple personal finance tracker</p>
-    </div>
+    <h1>🔥 Ember</h1>
+    <p>Your simple personal finance tracker</p>
   </header>
 
   <main>
     <section class="cards">
       <div class="card">
-        <span>Current balance</span>
+        <span>Balance</span>
         <strong id="balance">₦0.00</strong>
       </div>
       <div class="card">
-        <span>Total income</span>
+        <span>Income</span>
         <strong class="income" id="income">₦0.00</strong>
       </div>
       <div class="card">
-        <span>Total expenses</span>
+        <span>Expenses</span>
         <strong class="expense" id="expenses">₦0.00</strong>
       </div>
     </section>
@@ -228,7 +329,11 @@
     budgetInput.value = monthlyBudget || "";
 
     function money(value) {
-      return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(value);
+      return new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        minimumFractionDigits: 2
+      }).format(value);
     }
 
     function save() {
@@ -248,16 +353,16 @@
 
     function updateBudget() {
       if (!monthlyBudget) {
-        budgetStatus.innerHTML = `<p style="color:var(--muted); margin:0;">Set a monthly budget to track progress.</p>`;
+        budgetStatus.innerHTML = `<p style="color:var(--muted); margin:0; font-size:14px;">Set a monthly budget to track progress.</p>`;
         return;
       }
       const spent = currentMonthExpenses();
       const percent = Math.min(100, (spent / monthlyBudget) * 100);
       const remaining = monthlyBudget - spent;
       budgetStatus.innerHTML = `
-        <div style="font-size:14px;">Spent this month: <strong>${money(spent)}</strong> of ${money(monthlyBudget)}</div>
+        <div style="font-size:14.5px;">Spent this month: <strong>${money(spent)}</strong> of ${money(monthlyBudget)}</div>
         <div class="budget-bar"><div class="budget-fill" style="width:${percent}%; background:${percent > 90 ? 'var(--expense)' : 'var(--primary)'}"></div></div>
-        <div style="margin-top:8px; font-size:13px; color:${remaining < 0 ? 'var(--expense)' : 'var(--income)'}">
+        <div style="margin-top:8px; font-size:13.5px; color:${remaining < 0 ? 'var(--expense)' : 'var(--income)'}">
           ${remaining >= 0 ? `Remaining: ${money(remaining)}` : `Over budget by ${money(Math.abs(remaining))}`}
         </div>
       `;
@@ -274,11 +379,13 @@
       const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
       const max = sorted[0][1];
       categoryList.innerHTML = sorted.map(([cat, amt]) => `
-        <div class="cat-row">
-          <span>${cat}</span>
-          <strong>${money(amt)}</strong>
+        <div>
+          <div class="cat-row">
+            <span>${cat}</span>
+            <strong>${money(amt)}</strong>
+          </div>
+          <div class="cat-bar"><div class="cat-fill" style="width:${(amt / max) * 100}%"></div></div>
         </div>
-        <div class="cat-bar"><div class="cat-fill" style="width:${(amt / max) * 100}%"></div></div>
       `).join("");
       categoryPanel.style.display = "block";
     }
@@ -286,8 +393,10 @@
     function render() {
       const income = transactions.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
       const expenses = transactions.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+      const balance = income - expenses;
 
-      document.getElementById("balance").textContent = money(income - expenses);
+      document.getElementById("balance").textContent = money(balance);
+      document.getElementById("balance").className = balance < 0 ? "expense" : "";
       document.getElementById("income").textContent = money(income);
       document.getElementById("expenses").textContent = money(expenses);
 
